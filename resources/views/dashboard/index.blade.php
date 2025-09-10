@@ -110,36 +110,174 @@
             <canvas id="projectLineChart"></canvas>
         </div>
 
-<div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-    <table class="table table-bordered table-dark">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Stage</th>
-                <th>Status</th>
-                <th>Value</th>
-                <th>Created</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($leads as $lead)
-                <tr>
-                    <td>{{ $lead->name }}</td>
-                    <td>{{ $lead->stage }}</td>
-                    <td>{{ $lead->status }}</td>
-                    <td>{{ $lead->value }}</td>
-                    <td>{{ $lead->created_at->format('Y-m-d') }}</td>
-                </tr>
-            @endforeach
-        </tbody>
-    </table>
-</div>
-
-
-
+        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-bordered table-dark">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Stage</th>
+                        <th>Status</th>
+                        <th>Value</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($leads as $lead)
+                        <tr>
+                            <td>{{ $lead->name }}</td>
+                            <td>{{ $lead->stage }}</td>
+                            <td>{{ $lead->status }}</td>
+                            <td>{{ $lead->value }}</td>
+                            <td>{{ $lead->created_at->format('Y-m-d') }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
         </div>
     @endif
 </div>
+
+<div class="mb-4">
+    <h5 class="text-white">📊 Task Popularity (Top Completed Tasks Per Month)</h5>
+    <canvas id="taskPopularityChart"></canvas>
+    <p class="text-muted mt-2">
+        Last month’s most popular task: 
+        <strong>{{ $taskTopNames->last() ?? 'None' }}</strong>
+        ({{ $taskTopCounts->last() ?? 0 }})
+    </p>
+</div>
+
+<div class="mb-4">
+    <h5 class="text-white">📊 Project Popularity (Top Finished Projects Per Month)</h5>
+    <canvas id="projectPopularityChart"></canvas>
+    <p class="text-muted mt-2">
+        Last month’s most popular project: 
+        <strong>{{ $projectTopNames->last() ?? 'None' }}</strong>
+        ({{ $projectTopCounts->last() ?? 0 }})
+    </p>
+</div>
+
+{{-- Scripts --}}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // === Leads by Stage Chart ===
+    const ctx = document.getElementById('leadChart')?.getContext('2d');
+    if (ctx) {
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: {!! json_encode($chartData->keys()) !!},
+                datasets: [{
+                    label: 'Leads by Stage',
+                    data: {!! json_encode($chartData->values()) !!},
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)'
+                }]
+            }
+        });
+    }
+
+    // === Project Results Line Chart ===
+    const projectCtx = document.getElementById('projectLineChart')?.getContext('2d');
+    if (projectCtx) {
+        new Chart(projectCtx, {
+            type: 'line',
+            data: {
+                labels: {!! json_encode($labels) !!},
+                datasets: [
+                    {
+                        label: 'Good Projects',
+                        data: {!! json_encode($goodCounts) !!},
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        fill: false,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Bad Projects',
+                        data: {!! json_encode($badCounts) !!},
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        fill: false,
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 }
+                    }
+                }
+            }
+        });
+    }
+
+    // === Task Popularity Chart ===
+    const taskCtx = document.getElementById('taskPopularityChart')?.getContext('2d');
+    if (taskCtx) {
+        new Chart(taskCtx, {
+            type: 'bar',
+            data: {
+                labels: {!! json_encode($popMonths) !!},
+                datasets: [{
+                    label: 'Top Task Frequency',
+                    data: {!! json_encode($taskTopCounts) !!},
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)'
+                }]
+            },
+            options: {
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const taskNames = {!! json_encode($taskTopNames) !!};
+                                return `${taskNames[context.dataIndex] || 'No Task'}: ${context.raw}`;
+                            }
+                        }
+                    }
+                },
+                responsive: true,
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+            }
+        });
+    }
+
+    // === Project Popularity Chart ===
+    const projPopCtx = document.getElementById('projectPopularityChart')?.getContext('2d');
+    if (projPopCtx) {
+        new Chart(projPopCtx, {
+            type: 'bar',
+            data: {
+                labels: {!! json_encode($popMonths) !!},
+                datasets: [{
+                    label: 'Top Project Frequency',
+                    data: {!! json_encode($projectTopCounts) !!},
+                    backgroundColor: 'rgba(255, 99, 132, 0.7)'
+                }]
+            },
+            options: {
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const projectNames = {!! json_encode($projectTopNames) !!};
+                                return `${projectNames[context.dataIndex] || 'No Project'}: ${context.raw}`;
+                            }
+                        }
+                    }
+                },
+                responsive: true,
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+            }
+        });
+    }
+</script>
+@endsection
+
+
+
+
 
 {{-- Scripts --}}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
