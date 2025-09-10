@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 use App\Models\Task;
 use Illuminate\Http\Request;
 use App\Models\Lead;
-use App\Models\Project; // ✅ move this here
-use Illuminate\Support\Facades\DB; // ✅ move this here
+use App\Models\Project; 
+use Illuminate\Support\Facades\DB; 
 
 
 
@@ -69,6 +69,54 @@ $badCounts = $monthLabels->map(function ($month) use ($projectTrends) {
     return optional($projectTrends->get('bad'))->firstWhere('month', $month)->total ?? 0;
 });
 
+// === Top completed Task/Project per month (last 6 months) ===
+$months = collect(range(0, 5))
+    ->map(fn ($i) => now()->copy()->subMonths(5 - $i)->format('Y-m'));
+
+$taskPopular = $months->map(function ($ym) {
+    $start = \Carbon\Carbon::createFromFormat('Y-m', $ym)->startOfMonth();
+    $end   = \Carbon\Carbon::createFromFormat('Y-m', $ym)->endOfMonth();
+
+    $row = Task::select('title', DB::raw('COUNT(*) as total'))
+        ->where('status', 'completed')
+        ->whereBetween('updated_at', [$start, $end])   // using updated_at as completion proxy
+        ->groupBy('title')
+        ->orderByDesc('total')
+        ->first();
+
+    return [
+        'month' => $ym,
+        'name'  => $row->title ?? null,
+        'count' => $row->total ?? 0,
+    ];
+});
+
+$projectPopular = $months->map(function ($ym) {
+    $start = \Carbon\Carbon::createFromFormat('Y-m', $ym)->startOfMonth();
+    $end   = \Carbon\Carbon::createFromFormat('Y-m', $ym)->endOfMonth();
+
+    $row = Project::select('name', DB::raw('COUNT(*) as total'))
+        ->whereNotNull('result')                       // treat projects with a result as “finished”
+        ->whereBetween('created_at', [$start, $end])   // month bucket
+        ->groupBy('name')
+        ->orderByDesc('total')
+        ->first();
+
+    return [
+        'month' => $ym,
+        'name'  => $row->name ?? null,
+        'count' => $row->total ?? 0,
+    ];
+});
+
+// Pass to view
+$popMonths        = $months; // labels
+$taskTopNames     = $taskPopular->pluck('name');
+$taskTopCounts    = $taskPopular->pluck('count');
+$projectTopNames  = $projectPopular->pluck('name');
+$projectTopCounts = $projectPopular->pluck('count');
+
+
 
 $upcomingTasks = Task::whereNotNull('due_date')
     ->whereDate('due_date', '>=', now())
@@ -77,16 +125,21 @@ $upcomingTasks = Task::whereNotNull('due_date')
     ->get();
 
         return view('dashboard.index', [
-            'leads' => $leads,
-            'totalLeads' => $totalLeads,
-            'totalValue' => $totalValue,
-            'conversionRate' => $conversionRate,
-            'chartData' => $chartData,
-            'noData' => $noData,
-            'labels' => $monthLabels,
-            'goodCounts' => $goodCounts,
-            'badCounts' => $badCounts,
-            'upcomingTasks' => $upcomingTasks
+    'leads'            => $leads,
+    'totalLeads'       => $totalLeads,
+    'totalValue'       => $totalValue,
+    'conversionRate'   => $conversionRate,
+    'chartData'        => $chartData,
+    'noData'           => $noData,
+    'labels'           => $monthLabels,
+    'goodCounts'       => $goodCounts,
+    'badCounts'        => $badCounts,
+    'popMonths'        => $popMonths,
+    'taskTopNames'     => $taskTopNames,
+    'taskTopCounts'    => $taskTopCounts,
+    'projectTopNames'  => $projectTopNames,
+    'projectTopCounts' => $projectTopCounts,
+    'upcomingTasks'    => $upcomingTasks,
         ]);
     }
 }
